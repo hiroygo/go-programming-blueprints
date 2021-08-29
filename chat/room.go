@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/hiroygo/go-programming-blueprints/trace"
 )
 
 const (
@@ -14,12 +15,13 @@ const (
 
 var upgrader = &websocket.Upgrader{ReadBufferSize: socketBufferSize, WriteBufferSize: socketBufferSize}
 
-func newRoom() *room {
+func newRoom(t trace.Tracer) *room {
 	return &room{
 		forward: make(chan []byte),
 		join:    make(chan *client),
 		leave:   make(chan *client),
 		clients: make(map[*client]struct{}),
+		tracer:  t,
 	}
 }
 
@@ -32,6 +34,8 @@ type room struct {
 	leave chan *client
 	// 在室しているすべての client
 	clients map[*client]struct{}
+	// ロガー
+	tracer trace.Tracer
 }
 
 func (r *room) run() {
@@ -39,17 +43,23 @@ func (r *room) run() {
 		select {
 		case client := <-r.join:
 			r.clients[client] = struct{}{}
+			r.tracer.Trace("新しいクライアントが参加しました")
 		case client := <-r.leave:
 			delete(r.clients, client)
 			close(client.send)
+			r.tracer.Trace("クライアントが退室しました")
 		case b := <-r.forward:
+			r.tracer.Trace("メッセージを受信しました: ", string(b))
 			for client := range r.clients {
 				select {
 				case client.send <- b:
+					r.tracer.Trace(" -- クライアントに送信しました")
+
 				// client.send のバッファに空きが無いときに実行される
 				default:
 					close(client.send)
 					delete(r.clients, client)
+					r.tracer.Trace(" -- クライアントに送信出来ません。クライアントを削除しました")
 				}
 			}
 		}
