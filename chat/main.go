@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"html/template"
 	"log"
 	"net/http"
@@ -12,7 +13,7 @@ type templateHandler struct {
 }
 
 func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := t.templ.Execute(w, nil); err != nil {
+	if err := t.templ.Execute(w, r); err != nil {
 		log.Println(err)
 	}
 }
@@ -23,7 +24,15 @@ func newTemplateHandler(templatePath string) *templateHandler {
 	return t
 }
 
+func parseArgs() string {
+	addr := flag.String("addr", ":8080", "アプリケーションのアドレス")
+	flag.Parse()
+	return *addr
+}
+
 func main() {
+	addr := parseArgs()
+
 	th := newTemplateHandler(filepath.FromSlash(`templates/chat.html`))
 	http.Handle("/", th)
 
@@ -31,7 +40,8 @@ func main() {
 	http.Handle("/room", r)
 
 	go r.run()
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Printf("サーバ開始: %q\n", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatal(err)
 	}
 }
