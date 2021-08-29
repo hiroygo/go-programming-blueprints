@@ -6,6 +6,20 @@ import (
 	"testing"
 )
 
+func TestNew(t *testing.T) {
+	tr := New(&bytes.Buffer{})
+	rawTracer, ok := tr.(*tracer)
+	if !ok {
+		t.Fatalf("%T.(*tracer) error", rawTracer)
+	}
+
+	tr = New(nil)
+	rawNilTracer, ok := tr.(*nilTracer)
+	if !ok {
+		t.Fatalf("%T.(*nilTracer) error", rawNilTracer)
+	}
+}
+
 func TestTrace(t *testing.T) {
 	b := &bytes.Buffer{}
 	tracer := New(b)

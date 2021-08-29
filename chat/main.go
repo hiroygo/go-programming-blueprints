@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/hiroygo/go-programming-blueprints/trace"
@@ -39,7 +38,8 @@ func main() {
 	th := newTemplateHandler(filepath.FromSlash(`templates/chat.html`))
 	http.Handle("/", th)
 
-	r := newRoom(trace.New(os.Stderr))
+	// r := newRoom(trace.New(os.Stderr))
+	r := newRoom(trace.New(nil))
 	http.Handle("/room", r)
 
 	go r.run()

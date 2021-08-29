@@ -11,7 +11,17 @@ type Tracer interface {
 }
 
 func New(w io.Writer) Tracer {
+	// w が nil なら何もしない Tracer を返す
+	if w == nil {
+		return &nilTracer{}
+	}
 	return &tracer{w: w}
+}
+
+type nilTracer struct{}
+
+func (t *nilTracer) Trace(...interface{}) error {
+	return nil
 }
 
 type tracer struct {
