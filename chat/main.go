@@ -35,8 +35,11 @@ func parseArgs() string {
 func main() {
 	addr := parseArgs()
 
-	th := newTemplateHandler(filepath.FromSlash(`templates/chat.html`))
-	http.Handle("/", th)
+	chat := newTemplateHandler(filepath.FromSlash(`templates/chat.html`))
+	http.Handle("/chat", MustAuth(chat))
+
+	login := newTemplateHandler(filepath.FromSlash(`templates/login.html`))
+	http.Handle("/login", login)
 
 	// r := newRoom(trace.New(os.Stderr))
 	r := newRoom(trace.New(nil))
