@@ -8,7 +8,7 @@ type client struct {
 	socket *websocket.Conn
 	// room から届いたメッセージを受信する
 	// close は room が行う
-	send chan []byte
+	roomMsg chan []byte
 	// この client が参加している room
 	room *room
 }
@@ -26,7 +26,7 @@ func (c *client) read() {
 }
 
 func (c *client) write() {
-	for b := range c.send {
+	for b := range c.roomMsg {
 		// 相手のソケットが閉じると抜ける
 		err := c.socket.WriteMessage(websocket.TextMessage, b)
 		if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/hiroygo/go-programming-blueprints/trace"
@@ -46,18 +47,18 @@ func (r *room) run() {
 			r.tracer.Trace("新しいクライアントが参加しました")
 		case client := <-r.leave:
 			delete(r.clients, client)
-			close(client.send)
+			close(client.roomMsg)
 			r.tracer.Trace("クライアントが退室しました")
 		case b := <-r.forward:
 			r.tracer.Trace("メッセージを受信しました: ", string(b))
 			for client := range r.clients {
 				select {
-				case client.send <- b:
+				case client.roomMsg <- b:
 					r.tracer.Trace(" -- クライアントに送信しました")
 
 				// client.send のバッファに空きが無いときに実行される
 				default:
-					close(client.send)
+					close(client.roomMsg)
 					delete(r.clients, client)
 					r.tracer.Trace(" -- クライアントに送信出来ません。クライアントを削除しました")
 				}
@@ -73,12 +74,23 @@ func (r *room) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		log.Fatal(err)
 	}
 	client := &client{
-		socket: socket,
-		send:   make(chan []byte, messageBufferSize),
-		room:   r,
+		socket:  socket,
+		roomMsg: make(chan []byte, messageBufferSize),
+		room:    r,
 	}
 	r.join <- client
-	defer func() { r.leave <- client }()
-	go client.write()
-	client.read()
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer func() { r.leave <- client }()
+		defer func() { wg.Done() }()
+		client.read()
+	}()
+	wg.Add(1)
+	go func() {
+		defer func() { wg.Done() }()
+		client.write()
+	}()
+	wg.Wait()
 }
