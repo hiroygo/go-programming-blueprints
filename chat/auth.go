@@ -1,8 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
+
+	"github.com/stretchr/gomniauth"
 )
 
 type authHandler struct {
@@ -25,4 +29,32 @@ func (a *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func MustAuth(h http.Handler) http.Handler {
 	return &authHandler{next: h}
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	ss := strings.Split(r.URL.Path, "/")
+	if len(ss) != 4 {
+		log.Fatalf("len(Split(%v)) returns %v\n", r.URL.Path, len(ss))
+	}
+
+	action := ss[2]
+	provider := ss[3]
+	switch action {
+	case "login":
+		provider, err := gomniauth.Provider(provider)
+		if err != nil {
+			log.Fatalf("Provider error: %v\n", err)
+		}
+
+		loginUrl, err := provider.GetBeginAuthURL(nil, nil)
+		if err != nil {
+			log.Fatalf("GetBeginAuthURL error: %v\n", err)
+		}
+
+		w.Header().Set("Location", loginUrl)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "Auth action %s not supported", action)
+	}
 }
