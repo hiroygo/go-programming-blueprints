@@ -11,6 +11,7 @@ import (
 	"github.com/hiroygo/go-programming-blueprints/trace"
 	"github.com/stretchr/gomniauth"
 	"github.com/stretchr/gomniauth/providers/google"
+	"github.com/stretchr/objx"
 )
 
 type templateHandler struct {
@@ -18,7 +19,13 @@ type templateHandler struct {
 }
 
 func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := t.templ.Execute(w, r); err != nil {
+	data := map[string]interface{}{
+		"Host": r.Host,
+	}
+	if authCookie, err := r.Cookie("auth"); err == nil {
+		data["UserData"] = objx.MustFromBase64(authCookie.Value)
+	}
+	if err := t.templ.Execute(w, data); err != nil {
 		log.Println(err)
 	}
 }

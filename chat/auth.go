@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/stretchr/gomniauth"
+	"github.com/stretchr/objx"
 )
 
 type authHandler struct {
@@ -45,7 +46,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Fatalf("Provider error: %v\n", err)
 		}
-
 		loginUrl, err := provider.GetBeginAuthURL(nil, nil)
 		if err != nil {
 			log.Fatalf("GetBeginAuthURL error: %v\n", err)
@@ -53,8 +53,34 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Location", loginUrl)
 		w.WriteHeader(http.StatusTemporaryRedirect)
+	case "callback":
+		provider, err := gomniauth.Provider(provider)
+		if err != nil {
+			log.Fatalf("Provider error: %v\n", err)
+		}
+		creds, err := provider.CompleteAuth(objx.MustFromURLQuery(r.URL.RawQuery))
+		if err != nil {
+			log.Fatalf("CompleteAuth error: %v\n", err)
+		}
+		user, err := provider.GetUser(creds)
+		if err != nil {
+			log.Fatalf("GetUser error: %v\n", err)
+		}
+
+		// JSON 形式の文字列を base64 変換する
+		// e.g. `{"name":"yamada taro"}`
+		authValue := objx.New(map[string]interface{}{
+			"name": user.Name(),
+		}).MustBase64()
+		http.SetCookie(w, &http.Cookie{
+			Name:  "auth",
+			Value: authValue,
+			Path:  "/",
+		})
+		w.Header().Set("Location", "/chat")
+		w.WriteHeader(http.StatusTemporaryRedirect)
 	default:
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "Auth action %s not supported", action)
+		fmt.Fprintf(w, "Auth action %q not supported", action)
 	}
 }
