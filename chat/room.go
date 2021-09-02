@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/hiroygo/go-programming-blueprints/trace"
+	"github.com/stretchr/objx"
 )
 
 const (
@@ -18,7 +19,7 @@ var upgrader = &websocket.Upgrader{ReadBufferSize: socketBufferSize, WriteBuffer
 
 func newRoom(t trace.Tracer) *room {
 	return &room{
-		forward: make(chan []byte),
+		forward: make(chan *message),
 		join:    make(chan *client),
 		leave:   make(chan *client),
 		clients: make(map[*client]struct{}),
@@ -28,7 +29,7 @@ func newRoom(t trace.Tracer) *room {
 
 type room struct {
 	// ある client のメッセージを別の client に送る
-	forward chan []byte
+	forward chan *message
 	// room に参加しようとしている client のためのチャネル
 	join chan *client
 	// room から退室しようとしている client のためのチャネル
@@ -49,11 +50,11 @@ func (r *room) run() {
 			delete(r.clients, client)
 			close(client.roomMsg)
 			r.tracer.Trace("クライアントが退室しました")
-		case b := <-r.forward:
-			r.tracer.Trace("メッセージを受信しました: ", string(b))
+		case msg := <-r.forward:
+			r.tracer.Trace("メッセージを受信しました: ", msg.Message)
 			for client := range r.clients {
 				select {
-				case client.roomMsg <- b:
+				case client.roomMsg <- msg:
 					r.tracer.Trace(" -- クライアントに送信しました")
 
 				// client.send のバッファに空きが無いときに実行される
@@ -73,10 +74,16 @@ func (r *room) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	authCookie, err := req.Cookie("auth")
+	if err != nil {
+		log.Fatal(err)
+	}
 	client := &client{
-		socket:  socket,
-		roomMsg: make(chan []byte, messageBufferSize),
-		room:    r,
+		socket:   socket,
+		roomMsg:  make(chan *message, messageBufferSize),
+		room:     r,
+		userData: objx.MustFromBase64(authCookie.Value),
 	}
 	r.join <- client
 
